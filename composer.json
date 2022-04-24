@@ -1,0 +1,21 @@
+{
+    "name": "g-snowhawk/gsh-link2transfer",
+    "type": "library",
+    "description": "This library support to Gsnowhawk\\Srm connect to Gsnowhawk\\Oas",
+    "license": "MIT",
+    "author": {
+        "name": "Taka G",
+        "homepage": "https://www.p5on.net"
+    },
+    "require": {
+        "php": ">=7.4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "plugin\\Link2transfer\\" : "plugin/Link2transfer/"
+        },
+        "classmap": [
+            "plugin/Link2transfer/Link2transfer.php"
+        ]
+    }
+}
