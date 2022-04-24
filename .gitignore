@@ -1,0 +1,33 @@
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+[._]*.un~
+.DAV
+.svn/
+.netrwhist
+*~
+*.vim
+
+.php-cs-fixer.*
+!.php-cs-fixer.dist.php
+
+# Backup files
+*.bak
+*.gho
+*.old
+*.org
+*.ori
+*.orig
+*.tmp
+
+# DW Dreamweaver added files
+_notes
+_compareTemp
+configs/
+dwsync.xml
+dw_php_codehinting.config
+*.mno
+
+# Private data
