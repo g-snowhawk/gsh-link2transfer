@@ -52,7 +52,7 @@ class Link2transfer extends Plugin
                 [$this->uid, '% typeof="bill" %']
             );
             $receipts = [];
-            foreach ($post['note'] as $value) {
+            foreach ($post['note'] ?? [] as $value) {
                 // bill only
                 if (preg_match('/bill:([0-9]+)(.*)/', $value ?? '', $matches)
                     && strpos($matches[2], ':received') !== 0
