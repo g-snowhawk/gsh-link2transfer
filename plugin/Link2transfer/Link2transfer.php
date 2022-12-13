@@ -44,7 +44,10 @@ class Link2transfer extends Plugin
     {
         if ($caller_class === 'Gsnowhawk\\Oas\\Transfer\\Response') {
             $post = $this->caller->view->param('post');
-            $format = '?mode=srm.receipt.response:download-pdf&id='.$post['issue_date'].':%d:%d';
+
+            $issue_date = $post['issue_date'] ?? date('Y-m-d');
+            $format = '?mode=srm.receipt.response:download-pdf&id='.$issue_date.':%d:%d';
+
             $receipt_id = $this->db->get(
                 'id',
                 'receipt_template',
