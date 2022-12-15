@@ -42,33 +42,6 @@ class Link2transfer extends Plugin
 
     public function beforeRendering($caller_class)
     {
-        if ($caller_class === 'Gsnowhawk\\Oas\\Transfer\\Response') {
-            $post = $this->caller->view->param('post');
-
-            $issue_date = $post['issue_date'] ?? date('Y-m-d');
-            $format = '?mode=srm.receipt.response:download-pdf&id='.$issue_date.':%d:%d';
-
-            $receipt_id = $this->db->get(
-                'id',
-                'receipt_template',
-                'userkey = ? AND pdf_mapper LIKE ?',
-                [$this->uid, '% typeof="bill" %']
-            );
-            $receipts = [];
-            foreach ($post['note'] ?? [] as $value) {
-                // bill only
-                if (preg_match('/bill:([0-9]+)(.*)/', $value ?? '', $matches)
-                    && strpos($matches[2], ':received') !== 0
-                ) {
-                    $receipts[] = sprintf($format, $matches[1], $receipt_id);
-                }
-            }
-            $receipts = array_unique($receipts);
-            $this->caller->view->bind('receipts', $receipts);
-
-            return;
-        }
-
         if ($caller_class !== 'Gsnowhawk\\Srm\\Receipt\\Response') {
             return;
         }
