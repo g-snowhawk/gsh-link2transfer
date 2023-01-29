@@ -82,6 +82,12 @@ class Link2transfer extends Plugin
 
     public function afterSaveReceipt($caller_class, $post, $type, $total_price): bool
     {
+        $tax = 0;
+        if (is_array($total_price)) {
+            $tax = $total_price['tax'] ?? 0;
+            $total_price = array_sum($total_price);
+        }
+
         $relation = $post['relation'] ?? 'no';
         $draft = $post['draft'] ?? null;
         if (is_null($draft)) {
@@ -93,7 +99,7 @@ class Link2transfer extends Plugin
 
         if (method_exists($this, $type)) {
             $this->transfer = new Relational($this->caller, $this->app);
-            if (false === call_user_func_array([$this, $type], [$post, $total_price])) {
+            if (false === call_user_func_array([$this, $type], [$post, $total_price, $tax])) {
                 return false;
             }
         }
@@ -101,12 +107,28 @@ class Link2transfer extends Plugin
         return true;
     }
 
-    private function bill($post, $total_price)
+    private function bill($post, $total_price, $tax)
     {
         $note = 'bill:' . $post['receipt_number'];
         $category = 'T';
-        $sales_amount_code = $this->db->get('item_code', 'account_items', 'userkey = ? AND system_operator = ?', [$this->uid, 'SALES']);
-        $accounts_receivable_code = $this->db->get('item_code', 'account_items', 'userkey = ? AND system_operator = ?', [$this->uid, 'ACCOUNTS_RECEIVABLE']);
+        $sales_amount_code = $this->db->get(
+            'item_code',
+            'account_items',
+            'userkey = ? AND system_operator = ?',
+            [$this->uid, 'SALES']
+        );
+        $accounts_receivable_code = $this->db->get(
+            'item_code',
+            'account_items',
+            'userkey = ? AND system_operator = ?',
+            [$this->uid, 'ACCOUNTS_RECEIVABLE']
+        );
+        $tax_receipt_code = $this->db->get(
+            'item_code',
+            'account_items',
+            'userkey = ? AND system_operator = ?',
+            [$this->uid, 'TAX_RECEIPT']
+        );
         $received = '';
 
         if (empty($post['receipt'])) {
@@ -114,15 +136,30 @@ class Link2transfer extends Plugin
             $item_code_right = ['1' => $sales_amount_code, '2' => null];
             $datekey = 'issue_date';
         } else {
-            $payment_code = $this->db->get('item_code', 'bank', 'userkey = ? AND account_number = ?', [$this->uid, $post['bank_id']]);
+            $payment_code = $this->db->get(
+                'item_code',
+                'bank',
+                'userkey = ? AND account_number = ?',
+                [$this->uid, $post['bank_id']]
+            );
             if (!empty($post['cash']) || empty($payment_code)) {
                 $category = 'R';
-                $payment_code = $this->db->get('item_code', 'account_items', 'userkey = ? AND system_operator = ?', [$this->uid, 'CASH']);
+                $payment_code = $this->db->get(
+                    'item_code',
+                    'account_items',
+                    'userkey = ? AND system_operator = ?',
+                    [$this->uid, 'CASH']
+                );
             }
             $right_code = ($post['issue_date'] === $post['receipt'])
                 ? $sales_amount_code : $accounts_receivable_code;
-            $item_code_left = ['1' => $payment_code, '2' => null];
-            $item_code_right = ['1' => $right_code, '2' => null];
+            if ($tax > 0) {
+                $item_code_left = ['1' => $payment_code, '2' => null, '3' => null];
+                $item_code_right = ['1' => $right_code, '2' => $tax, '3' => null];
+            } else {
+                $item_code_left = ['1' => $payment_code, '2' => null];
+                $item_code_right = ['1' => $right_code, '2' => null];
+            }
             $this->request->param('issue_date', $post['receipt']);
             $datekey = 'receipt';
             $received = ':received';
@@ -140,13 +177,23 @@ class Link2transfer extends Plugin
 
         $note .= $received;
 
-        $this->request->param('category', $category);
-        $this->request->param('amount_left', ['1' => $total_price, '2' => null]);
-        $this->request->param('item_code_left', $item_code_left);
-        $this->request->param('summary', ['1' => $post['subject'], '2' => $post['company']]);
-        $this->request->param('item_code_right', $item_code_right);
-        $this->request->param('amount_right', ['1' => $total_price, '2' => null]);
-        $this->request->param('note', ['1' => $note, '2' => $note]);
+        if ($tax > 0) {
+            $this->request->param('category', $category);
+            $this->request->param('amount_left', ['1' => $total_price, '2' => null, '3' => null]);
+            $this->request->param('item_code_left', $item_code_left);
+            $this->request->param('summary', ['1' => $post['subject'], '2' => null, '3' => $post['company']]);
+            $this->request->param('item_code_right', $item_code_right);
+            $this->request->param('amount_right', ['1' => $total_price - $tax, '2' => $tax, '3' => null]);
+            $this->request->param('note', ['1' => $note, '2' => $note, '3' => $note]);
+        } else {
+            $this->request->param('category', $category);
+            $this->request->param('amount_left', ['1' => $total_price, '2' => null]);
+            $this->request->param('item_code_left', $item_code_left);
+            $this->request->param('summary', ['1' => $post['subject'], '2' => $post['company']]);
+            $this->request->param('item_code_right', $item_code_right);
+            $this->request->param('amount_right', ['1' => $total_price, '2' => null]);
+            $this->request->param('note', ['1' => $note, '2' => $note]);
+        }
 
         $result = $this->transfer->save();
 
@@ -165,23 +212,49 @@ class Link2transfer extends Plugin
         return $result;
     }
 
-    private function receipt($post, $total_price)
+    private function receipt($post, $total_price, $tax)
     {
         $note = 'receipt:' . $post['receipt_number'];
         $category = 'R';
-        $sales_amount_code = $this->db->get('item_code', 'account_items', 'userkey = ? AND system_operator = ?', [$this->uid, 'SALES']);
-        $payment_code = $this->db->get('item_code', 'account_items', 'userkey = ? AND system_operator = ?', [$this->uid, 'CASH']);
+        $sales_amount_code = $this->db->get(
+            'item_code',
+            'account_items',
+            'userkey = ? AND system_operator = ?',
+            [$this->uid, 'SALES']
+        );
+        $payment_code = $this->db->get(
+            'item_code',
+            'account_items',
+            'userkey = ? AND system_operator = ?',
+            [$this->uid, 'CASH']
+        );
+        $tax_receipt_code = $this->db->get(
+            'item_code',
+            'account_items',
+            'userkey = ? AND system_operator = ?',
+            [$this->uid, 'TAX_RECEIPT']
+        );
 
         if (!empty($post['bank_id'])) {
             $category = 'T';
-            $payment_code = $this->db->get('item_code', 'bank', 'userkey = ? AND account_number = ?', [$this->uid, $post['bank_id']]);
+            $payment_code = $this->db->get(
+                'item_code',
+                'bank',
+                'userkey = ? AND account_number = ?',
+                [$this->uid, $post['bank_id']]
+            );
         }
 
         if (empty($post['receipt'])) {
             $post['receipt'] = $post['issue_date'];
         }
-        $item_code_left = ['1' => $payment_code, '2' => null];
-        $item_code_right = ['1' => $sales_amount_code, '2' => null];
+        if ($tax > 0) {
+            $item_code_left = ['1' => $payment_code, '2' => null, '3' => null];
+            $item_code_right = ['1' => $sales_amount_code, '2' => $tax, '3' => null];
+        } else {
+            $item_code_left = ['1' => $payment_code, '2' => null];
+            $item_code_right = ['1' => $sales_amount_code, '2' => null];
+        }
         $this->request->param('issue_date', $post['receipt']);
         $datekey = 'receipt';
 
@@ -193,15 +266,22 @@ class Link2transfer extends Plugin
         );
         if (!empty($page_number)) {
             $this->request->param('page_number', $page_number);
+            $this->request->param('category', $category);
+            $this->request->param('amount_left', ['1' => $total_price, '2' => null, '3' => null]);
+            $this->request->param('item_code_left', $item_code_left);
+            $this->request->param('summary', ['1' => $post['subject'], '2' => null, '3' => $post['company']]);
+            $this->request->param('item_code_right', $item_code_right);
+            $this->request->param('amount_right', ['1' => $total_price - $tax, '2' => $tax, '3' => null]);
+            $this->request->param('note', ['1' => $note, '2' => $note, '3' => $note]);
+        } else {
+            $this->request->param('category', $category);
+            $this->request->param('amount_left', ['1' => $total_price, '2' => null]);
+            $this->request->param('item_code_left', $item_code_left);
+            $this->request->param('summary', ['1' => $post['subject'], '2' => $post['company']]);
+            $this->request->param('item_code_right', $item_code_right);
+            $this->request->param('amount_right', ['1' => $total_price, '2' => null]);
+            $this->request->param('note', ['1' => $note, '2' => $note]);
         }
-
-        $this->request->param('category', $category);
-        $this->request->param('amount_left', ['1' => $total_price, '2' => null]);
-        $this->request->param('item_code_left', $item_code_left);
-        $this->request->param('summary', ['1' => $post['subject'], '2' => $post['company']]);
-        $this->request->param('item_code_right', $item_code_right);
-        $this->request->param('amount_right', ['1' => $total_price, '2' => null]);
-        $this->request->param('note', ['1' => $note, '2' => $note]);
 
         $result = $this->transfer->save();
 
