@@ -154,8 +154,8 @@ class Link2transfer extends Plugin
             $right_code = ($post['issue_date'] === $post['receipt'])
                 ? $sales_amount_code : $accounts_receivable_code;
             if ($tax > 0) {
-                $item_code_left = ['1' => $payment_code, '2' => null, '3' => null];
-                $item_code_right = ['1' => $tax_receipt_code, '2' => $tax, '3' => null];
+                $item_code_left = ['1' => $payment_code, '2' => $tax_receipt_code, '3' => null];
+                $item_code_right = ['1' => $right_code, '2' => $tax, '3' => null];
             } else {
                 $item_code_left = ['1' => $payment_code, '2' => null];
                 $item_code_right = ['1' => $right_code, '2' => null];
@@ -249,8 +249,8 @@ class Link2transfer extends Plugin
             $post['receipt'] = $post['issue_date'];
         }
         if ($tax > 0) {
-            $item_code_left = ['1' => $payment_code, '2' => null, '3' => null];
-            $item_code_right = ['1' => $tax_receipt_code, '2' => $tax, '3' => null];
+            $item_code_left = ['1' => $payment_code, '2' => $tax_receipt_code, '3' => null];
+            $item_code_right = ['1' => $sales_amount_code, '2' => $tax, '3' => null];
         } else {
             $item_code_left = ['1' => $payment_code, '2' => null];
             $item_code_right = ['1' => $sales_amount_code, '2' => null];
