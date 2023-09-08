@@ -134,6 +134,10 @@ class Link2transfer extends Plugin
         if (empty($post['receipt'])) {
             $item_code_left = ['1' => $accounts_receivable_code, '2' => null];
             $item_code_right = ['1' => $sales_amount_code, '2' => null];
+            if ($tax > 0) {
+                $item_code_left['3'] = null;
+                $item_code_right = ['1' => $sales_amount_code, '2' => $tax_receipt_code, '3' => null];
+            }
             $datekey = 'issue_date';
         } else {
             $payment_code = $this->db->get(
@@ -151,11 +155,13 @@ class Link2transfer extends Plugin
                     [$this->uid, 'CASH']
                 );
             }
-            $right_code = ($post['issue_date'] === $post['receipt'])
-                ? $sales_amount_code : $accounts_receivable_code;
+            $right_code = ($post['issue_date'] === $post['receipt']) ? $sales_amount_code : $accounts_receivable_code;
+            if ($right_code === $accounts_receivable_code) {
+                $tax = 0;
+            }
             if ($tax > 0) {
-                $item_code_left = ['1' => $payment_code, '2' => $tax_receipt_code, '3' => null];
-                $item_code_right = ['1' => $right_code, '2' => $tax, '3' => null];
+                $item_code_left = ['1' => $payment_code, '2' => null, '3' => null];
+                $item_code_right = ['1' => $right_code, '2' => $tax_receipt_code, '3' => null];
             } else {
                 $item_code_left = ['1' => $payment_code, '2' => null];
                 $item_code_right = ['1' => $right_code, '2' => null];
